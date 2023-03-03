@@ -1,27 +1,19 @@
 import discord
 from discord.ext import commands, tasks
 import os
-import logging
 import sqlite3
-import platform
 import random
 import asyncio
 
 bot = commands.Bot(command_prefix=os.getenv('DISCORD_PREFIX'),intents=discord.Intents.all())
+bot = bot
+
+# Connect to Database
 conn = sqlite3.connect('money.db')
 c = conn.cursor()
-
 # Create table if it doesn't exist
 c.execute('''CREATE TABLE IF NOT EXISTS money
-        (user_id TEXT PRIMARY KEY, balance INTEGER, last_daily INTEGER, cap INTEGER)''')
-
-# Init the user if it is their first message
-def init_user(self,user_id):
-    balance = 0
-    last_daily = 0
-    cap = 10000
-    c.execute('REPLACE INTO money (user_id, balance, last_daily, cap) VALUES (?, ?, ?, ?)', (user_id, balance, 0, cap))
-    return
+            (user_id TEXT PRIMARY KEY, balance INTEGER, last_daily INTEGER, cap INTEGER)''')
 
 @tasks.loop(minutes=1.0)
 async def status_task() -> None:

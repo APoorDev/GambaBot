@@ -27,12 +27,12 @@ class Gamba(commands):
     async def daily(self, ctx):
         user_id = str(ctx.author.id)
         self.c.execute('SELECT balance, last_daily, cap FROM money WHERE user_id=?', (user_id,))
-        result = c.fetchone()
+        result = self.c.fetchone()
         amount = 100
         if result is None:
             self.init_user(user_id)
             self.c.execute('SELECT balance, last_daily, cap FROM money WHERE user_id=?', (user_id,))
-            result = c.fetchone()
+            result = self.c.fetchone()
         balance, last_daily, cap = result
 
         if time.time() - last_daily < 86400:

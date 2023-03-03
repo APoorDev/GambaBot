@@ -1,53 +1,45 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
+import logging
 import sqlite3
-import time
+import platform
+import random
+import asyncio
 
-class Gamba(commands):
-    def __init__(self, bot):
-        self.bot = commands.Bot(command_prefix=os.getenv('DISCORD_PREFIX'),intents=discord.Intents.all())
-        self.conn = sqlite3.connect('money.db')
-        self.c = self.conn.cursor()
+bot = commands.Bot(command_prefix=os.getenv('DISCORD_PREFIX'),intents=discord.Intents.all())
+conn = sqlite3.connect('money.db')
+c = conn.cursor()
 
-        # Create table if it doesn't exist
-        self.c.execute('''CREATE TABLE IF NOT EXISTS money
-             (user_id TEXT PRIMARY KEY, balance INTEGER, last_daily INTEGER, cap INTEGER)''')
+# Create table if it doesn't exist
+c.execute('''CREATE TABLE IF NOT EXISTS money
+        (user_id TEXT PRIMARY KEY, balance INTEGER, last_daily INTEGER, cap INTEGER)''')
 
-    # Init the user if it is their first message
-    def init_user(self,user_id):
-        balance = 0
-        last_daily = 0
-        cap = 10000
-        self.c.execute('REPLACE INTO money (user_id, balance, last_daily, cap) VALUES (?, ?, ?, ?)', (user_id, balance, 0, cap))
-        return
+# Init the user if it is their first message
+def init_user(self,user_id):
+    balance = 0
+    last_daily = 0
+    cap = 10000
+    c.execute('REPLACE INTO money (user_id, balance, last_daily, cap) VALUES (?, ?, ?, ?)', (user_id, balance, 0, cap))
+    return
 
-    # Daily reward command
-    @commands.command()
-    async def daily(self, ctx):
-        user_id = str(ctx.author.id)
-        self.c.execute('SELECT balance, last_daily, cap FROM money WHERE user_id=?', (user_id,))
-        result = self.c.fetchone()
-        amount = 100
-        if result is None:
-            self.init_user(user_id)
-            self.c.execute('SELECT balance, last_daily, cap FROM money WHERE user_id=?', (user_id,))
-            result = self.c.fetchone()
-        balance, last_daily, cap = result
+@tasks.loop(minutes=1.0)
+async def status_task() -> None:
+    statuses = ["Stealing your money!", "Come on, bet a little more.", "!daily"]
+    await bot.change_presence(activity=discord.Game(random.choice(statuses)))
 
-        if time.time() - last_daily < 86400:
-            await ctx.send("You can only claim your daily reward once every 24 hours.")
-            return
+# Load all the commands
+async def load_cogs() -> None:
+    for file in os.listdir(f"{os.path.realpath(os.path.dirname(__file__))}/cogs"):
+        if file.endswith(".py"):
+            extension = file[:-3]
+            try:
+                await bot.load_extension(f"cogs.{extension}")
+                print(f"Loaded extension '{extension}'")
+            except Exception as e:
+                exception = f"{type(e).__name__}: {e}"
+                print(f"Failed to load extension {extension}\n{exception}")
+
+asyncio.run(load_cogs())
+bot.run(os.getenv('DISCORD_TOKEN'))
     
-        if balance + amount > cap:
-            await ctx.send("You have reached your money cap. Use `!upgrade_cap` command to increase your cap.")
-            return
-    
-        new_balance = balance + amount
-        await ctx.send(f"You claimed your daily reward of 100 coins! Your new balance is {new_balance} coins.")
-
-        self.c.execute('UPDATE money SET balance = ?, last_daily = ? WHERE user_id = ?', (new_balance, int(time.time()), user_id))
-        self.conn.commit()
-        
-def setup(bot):
-    bot.run(os.getenv('DISCORD_TOKEN'))
